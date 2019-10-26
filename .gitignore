@@ -90,6 +90,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# PyCharm
+.idea/
+
+# Output image
+*.led
+
 # Spyder project settings
 .spyderproject
 .spyproject
