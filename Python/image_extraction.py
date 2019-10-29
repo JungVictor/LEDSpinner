@@ -4,57 +4,40 @@ import matplotlib.pyplot as plt
 
 # Nom de l'image
 NAME = "60x.jpg"
-# Taille de l'image
-# La taille réelle de l'image devrait toujours être 1 pixel de plus (60 => 61x61)
-SIZE = 60
+
+SIZE = 42
 
 
 image = plt.imread(NAME)
 reconstruction = [[[0, 0, 0] for y in range(len(image[x]))] for x in range(len(image))]
 
-# Quel pixel de l'image doit-on choisir pour tracer la ligne de (x0, y0) à (x1, y1)
-def line(x0, y0, x1, y1):
-    return list(bresenham.bresenham(x0, y0, x1, y1))
-
-
-# Ligne de pixels pour chaque ligne de la matrice
-def build_pattern_matrix(size):
-    pattern_matrix = []
-    for x in range(size):
-        pattern_matrix.append(line(x, 0, size - x, size))
-
-    for y in range(size):
-        pattern_matrix.append(line(size, y, 0, size - y))
-
-    return pattern_matrix
-
-
-# Construit le tableau des couleurs de la bande LED pour chaque ligne
-def extract(img, size):
-    pattern_matrix = build_pattern_matrix(size)
-    new_img = []
-    for i in range(len(pattern_matrix)):
-        deg = pattern_matrix[i]
-        line = []
-        for j in range(len(deg)):
-            x, y = deg[j]
-            line.append(img[x][y])
-        new_img.append(line)
-    return new_img, pattern_matrix
-
-
-# Fonction de test pour tracer le dessin obtenu avec la rotation de la bande jusqu'à l'angle x
-def trace(extraction, support, pattern, angle):
-    for i in range(angle):
-        support = traceOne(extraction, support, pattern, i)
-    return support
+def extract(img):
+    size = len(img)
+    ratio = size / SIZE
+    res = []
+    image = [[img[x][y] for y in range(len(img[x]))] for x in range(len(img))]
+    for i in range(180):
+        radian = i / 180 * np.pi
+        cos = np.cos(radian)
+        sin = np.sin(radian)
+        res.append([[0,0,0] for o in range(SIZE)])
+        for j in range(SIZE // 2):
+            k = j * ratio
+            xPos1 = int(np.round(cos * k + size/2))
+            yPos1 = int(np.round(sin * k + size/2))
+            xPos2 = size - xPos1
+            yPos2 = size - yPos1
+            res[i][j] = img[xPos1][yPos1]
+            res[i][-j] = img[xPos2][yPos2]
+            image[xPos1][yPos1] = [0,0,0]
+            image[xPos2][yPos2] = [0,0,0]
+    return res, image
 
 
 # Pareil mais pour une ligne
 def traceOne(extraction, support, pattern, angle):
     size = len(extraction)
     angle = int(np.floor(angle * (size / 180)))
-    print(angle)
     LEDS = extraction[angle]
     coords = pattern[angle]
     for i in range(len(coords)):
@@ -63,13 +46,77 @@ def traceOne(extraction, support, pattern, angle):
     return support
 
 
+def trace(extraction, support, pattern, angle):
+    for i in range(angle):
+        support = traceOne(extraction, support, pattern, i)
+    return support
+
+
+def eq_color(c1, c2):
+    for i in range(len(c1)):
+        if c1[i] != c2[i]:
+            return False
+    return True
+
+def compress_color(c1, factor=20):
+    color = []
+    for c in c1:
+        color.append(int(np.round(c/factor))*factor)
+    return color
+
+
+def compress_img_color(img, factor=20):
+    color = [[img[l][p] for p in range(len(img[l]))] for l in range(len(img))]
+    for l in range(len(img)):
+        for p in range(len(img[l])):
+            color[l][p] = compress_color(img[l][p], factor)
+    return color
+
+
+def compress(img):
+    compressed = []
+    xSize = len(img)
+    ySize = len(img[0])
+    pixel = None
+    count = 0
+    compressed_pixel = 0
+    for x in range(xSize):
+        compressed.append([])
+        for y in range(ySize):
+            color = img[x][y]
+            if y == 0:
+                pixel = color
+            if not eq_color(pixel, color):
+                compressed[x].append((pixel, count))
+                count = 0
+                pixel = color
+                compressed_pixel += count
+            count += 1
+        compressed[x].append((pixel, count))
+        compressed_pixel += count
+        count = 0
+        pixel = None
+    compression_rate = compressed_pixel / (xSize * ySize) * 100
+    print(compression_rate)
+    return compressed, compression_rate
+
+
+def sampling(img, step):
+    nSamples = 180 // step
+    samples = []
+    for i in range(nSamples):
+        samples.append(img[i*step])
+    return samples
+
+
 # Sauvegarde l'image dans un .txt
-def save(image, step=10):
-    img = "{"
+def save(image):
+    img = "const int EXTRACTION_SIZE = %s;\nconst float RAPPORT = EXTRACTION_SIZE / MAX_DEGREE;\n" % len(image)
+    img += "CRGB picture[EXTRACTION_SIZE][IMAGE_SIZE] = {"
     for l in range(len(image)):
         line = image[l]
         img += "{"
-        for i in range(0, len(line), step):
+        for i in range(len(line)):
             r, g, b = line[i]
             img += "CRGB(%s, %s, %s)" % (r, g, b)
             if i != len(line)-1:
@@ -78,24 +125,33 @@ def save(image, step=10):
         img += "}"
         if l != len(image)-1:
             img += ","
-    img += "}"
+    img += "};\n"
     f = open("output.led", "w+")
     f.write(img)
+    print("Saved")
 
-
-# Affiche l'image de base
+# Image de base
 plt.imshow(image)
 plt.show()
 
+# Image couleur compressée
+image = compress_img_color(image, 30)
+plt.imshow(image)
+plt.show()
+
+
 # Affiche l'image extraite
-new_img, pattern_matrix = extract(image, SIZE)
+new_img, img = extract(image)
+
+# Affiche l'image de base
 plt.imshow(new_img)
 plt.show()
 
-# Affiche la reconstruction de l'image à partir de l'image extraite jusqu'à l'angle x
-reconstruction = trace(new_img, reconstruction, pattern_matrix, 180)
-plt.imshow(reconstruction)
+sampled = sampling(new_img, 15)
+plt.imshow(sampled)
 plt.show()
 
-# Sauvegarde l'image
-save(new_img)
+compressed, rating = compress(sampled)
+
+save(sampled)
+
