@@ -1,4 +1,3 @@
-import bresenham
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -7,9 +6,20 @@ NAME = "60x.jpg"
 
 SIZE = 42
 
-
 image = plt.imread(NAME)
 reconstruction = [[[0, 0, 0] for y in range(len(image[x]))] for x in range(len(image))]
+
+def black_and_white(img):
+    bw = []
+    for l in range(len(img)):
+        bw.append([])
+        line = img[l]
+        for pixel in line:
+            if(pixel[0]+pixel[1]+pixel[2] > 381) :
+                bw[l].append([255,255,255])
+            else:
+                bw[l].append([0,0,0])
+    return bw
 
 def extract(img):
     size = len(img)
@@ -18,6 +28,7 @@ def extract(img):
     image = [[img[x][y] for y in range(len(img[x]))] for x in range(len(img))]
     for i in range(180):
         radian = i / 180 * np.pi
+        print(radian)
         cos = np.cos(radian)
         sin = np.sin(radian)
         res.append([[0,0,0] for o in range(SIZE)])
@@ -27,10 +38,11 @@ def extract(img):
             yPos1 = int(np.round(sin * k + size/2))
             xPos2 = size - xPos1
             yPos2 = size - yPos1
-            res[i][j] = img[xPos1][yPos1]
-            res[i][-j] = img[xPos2][yPos2]
-            image[xPos1][yPos1] = [0,0,0]
-            image[xPos2][yPos2] = [0,0,0]
+            res[i][j+SIZE//2] = img[xPos1][yPos1]
+            res[i][SIZE//2-j-1] = img[xPos2][yPos2]
+            print(xPos1, yPos1, img[xPos1][yPos1])
+            image[xPos1][yPos1] = [255,0,0]
+            image[xPos2][yPos2] = [255,0,0]
     return res, image
 
 
@@ -61,9 +73,8 @@ def eq_color(c1, c2):
 def compress_color(c1, factor=20):
     color = []
     for c in c1:
-        color.append(int(np.round(c/factor))*factor)
+        color.append(min(int(np.round(c/factor))*factor, 255))
     return color
-
 
 def compress_img_color(img, factor=20):
     color = [[img[l][p] for p in range(len(img[l]))] for l in range(len(img))]
@@ -105,13 +116,14 @@ def sampling(img, step):
     nSamples = 180 // step
     samples = []
     for i in range(nSamples):
+        print(i*step)
         samples.append(img[i*step])
     return samples
 
 
 # Sauvegarde l'image dans un .txt
 def save(image):
-    img = "const int EXTRACTION_SIZE = %s;\nconst float RAPPORT = EXTRACTION_SIZE / MAX_DEGREE;\n" % len(image)
+    img = "const int EXTRACTION_SIZE = %s;\n" % len(image)
     img += "CRGB picture[EXTRACTION_SIZE][IMAGE_SIZE] = {"
     for l in range(len(image)):
         line = image[l]
@@ -130,18 +142,24 @@ def save(image):
     f.write(img)
     print("Saved")
 
+print(image)
+
 # Image de base
 plt.imshow(image)
 plt.show()
 
 # Image couleur compressée
-image = compress_img_color(image, 30)
+image = compress_img_color(image, 15)
+image = black_and_white(image)
 plt.imshow(image)
 plt.show()
 
-
 # Affiche l'image extraite
 new_img, img = extract(image)
+
+# Affiche l'image de base
+plt.imshow(img)
+plt.show()
 
 # Affiche l'image de base
 plt.imshow(new_img)
@@ -149,6 +167,7 @@ plt.show()
 
 sampled = sampling(new_img, 15)
 plt.imshow(sampled)
+plt.show()
 plt.show()
 
 compressed, rating = compress(sampled)
