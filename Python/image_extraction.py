@@ -1,8 +1,9 @@
+import PIL
 import numpy as np
 import matplotlib.pyplot as plt
 
 # Nom de l'image
-NAME = "60x.jpg"
+NAME = "ow.jpg"
 
 SIZE = 42
 
@@ -15,10 +16,13 @@ def black_and_white(img):
         bw.append([])
         line = img[l]
         for pixel in line:
-            if(pixel[0]+pixel[1]+pixel[2] > 381) :
-                bw[l].append([255,255,255])
-            else:
-                bw[l].append([0,0,0])
+            color = [0, 0, 0]
+            for i in range(3):
+                if pixel[i] > 127 :
+                    color[i] = 255
+                else:
+                    color[i] = 0
+            bw[l].append(color)
     return bw
 
 def extract(img):
@@ -28,7 +32,6 @@ def extract(img):
     image = [[img[x][y] for y in range(len(img[x]))] for x in range(len(img))]
     for i in range(180):
         radian = i / 180 * np.pi
-        print(radian)
         cos = np.cos(radian)
         sin = np.sin(radian)
         res.append([[0,0,0] for o in range(SIZE)])
@@ -40,7 +43,6 @@ def extract(img):
             yPos2 = size - yPos1
             res[i][j+SIZE//2] = img[xPos1][yPos1]
             res[i][SIZE//2-j-1] = img[xPos2][yPos2]
-            print(xPos1, yPos1, img[xPos1][yPos1])
             image[xPos1][yPos1] = [255,0,0]
             image[xPos2][yPos2] = [255,0,0]
     return res, image
@@ -76,6 +78,7 @@ def compress_color(c1, factor=20):
         color.append(min(int(np.round(c/factor))*factor, 255))
     return color
 
+
 def compress_img_color(img, factor=20):
     color = [[img[l][p] for p in range(len(img[l]))] for l in range(len(img))]
     for l in range(len(img)):
@@ -108,7 +111,7 @@ def compress(img):
         count = 0
         pixel = None
     compression_rate = compressed_pixel / (xSize * ySize) * 100
-    print(compression_rate)
+    print("Compression rate : %s" % compression_rate)
     return compressed, compression_rate
 
 
@@ -116,7 +119,6 @@ def sampling(img, step):
     nSamples = 180 // step
     samples = []
     for i in range(nSamples):
-        print(i*step)
         samples.append(img[i*step])
     return samples
 
@@ -142,7 +144,6 @@ def save(image):
     f.write(img)
     print("Saved")
 
-print(image)
 
 # Image de base
 plt.imshow(image)
@@ -150,7 +151,6 @@ plt.show()
 
 # Image couleur compressée
 image = compress_img_color(image, 15)
-image = black_and_white(image)
 plt.imshow(image)
 plt.show()
 
