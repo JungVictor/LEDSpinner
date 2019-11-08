@@ -10,7 +10,7 @@ OUTPUT_DIR = "output/"
 # Nom du fichier de sauvegarde
 FILE_NAME = "sonic"
 # Nom de l'image
-NAME = ["sonic1.jpg", "sonic2.jpg"]
+NAME = ["sonic1.jpg"]
 
 # On compresse les couleurs ?
 COMPRESS_COLOR = False
@@ -184,20 +184,23 @@ def generateCode(image):
             dico[pixel].append((l, p))
 
     code = ""
+    TAB = "\t"
+    if len(NAME) > 1:
+        TAB += TAB
     colors = sorted(dico, key=lambda k: len(dico[k]), reverse=False)
     for c in range(len(colors)-1):
         color = colors[c]
         position = dico[color]
         if c == 0:
-            condition = "\t\tif ("
+            condition = TAB+"if ("
         else :
-            condition = "\t\telse if ("
+            condition = TAB+"else if ("
         for p in range(len(position)-1):
             condition += "(angle == %s && index == %s) || " % position[p]
         condition += "(angle == %s && index == %s)" % position[-1]
         condition += ") return " + color + ";\n"
         code += condition
-    code += "\t\telse return %s;" % colors[-1]
+    code += TAB+"else return %s;" % colors[-1]
     return code
 
 
@@ -273,7 +276,10 @@ for image in images:
     sampled = sampled[-1]
 
     if cpt == len(images)-1:
-        CODE += "\telse {\n%s\n\t}\n" % generateCode(image)
+        if len(NAME) > 1:
+            CODE += "\telse {\n%s\n\t}\n" % generateCode(image)
+        else:
+            CODE += "%s\n" % generateCode(image)
     else:
         CODE += "\tif(IMAGE == %s) {\n%s\n\t}\n" % (cpt, generateCode(image))
     cpt += 1
