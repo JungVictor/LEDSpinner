@@ -7,15 +7,17 @@ OUTPUT_DIR = "output/"
 ############################################
 # CONFIGURATION
 ############################################
+# Nom du fichier de sauvegarde
+FILE_NAME = "sonic"
 # Nom de l'image
-NAME = "sonic2.jpg"
+NAME = ["sonic1.jpg", "sonic2.jpg"]
 
 # On compresse les couleurs ?
 COMPRESS_COLOR = False
 # Si oui, de combien ?
 COLOR_APPROX_FACTOR = 50
 # Combien de ligne d'angle on garde
-SAMPLING = [180, 90, 45]
+SAMPLING = [45]
 
 
 SHOW_IMAGE = True
@@ -29,8 +31,8 @@ SHOW_RECONSTRUCTED_IMAGE = True
 SIZE = 42
 ############################################
 
-image = plt.imread(IMAGE_DIR+NAME)
-reconstruction = [[[0, 0, 0] for y in range(len(image[x]))] for x in range(len(image))]
+images = [plt.imread(IMAGE_DIR+n) for n in NAME]
+reconstruction = [[[0, 0, 0] for y in range(len(images[0][x]))] for x in range(len(images))]
 
 
 def bit(img):
@@ -161,30 +163,16 @@ def sampling(img, step):
     return samples
 
 
-# Sauvegarde l'image dans un .txt
-def save(image):
-    img = "const int EXTRACTION_SIZE = %s;\n" % len(image)
-    img += "CRGB picture[EXTRACTION_SIZE][IMAGE_SIZE] = {"
-    for l in range(len(image)):
-        line = image[l]
-        img += "{"
-        for i in range(len(line)):
-            r, g, b = line[i]
-            img += "CRGB(%s, %s, %s)" % (r, g, b)
-            if i != len(line)-1:
-                img += ", "
-
-        img += "}"
-        if l != len(image)-1:
-            img += ","
-    img += "};\n"
-    name = NAME[:-4]
-    f = open(OUTPUT_DIR+name+"-%s.led" % len(image), "w+")
-    f.write(img)
-    print("Saved")
+# Sauvegarde l'image dans un .led
+def save(txt):
+    filename = OUTPUT_DIR+FILE_NAME+"-%s-%s.led" % (len(NAME), SAMPLING[-1])
+    f = open(filename, "w+")
+    f.write(txt)
+    print("Saved as %s" % filename)
 
 
-def save_tmp(image):
+# Génère le code de l'image
+def generateCode(image):
     dico = {}
     for l in range(len(image)):
         line = image[l]
@@ -201,15 +189,15 @@ def save_tmp(image):
         color = colors[c]
         position = dico[color]
         if c == 0:
-            condition = "\tif ("
+            condition = "\t\tif ("
         else :
-            condition = "\telse if ("
+            condition = "\t\telse if ("
         for p in range(len(position)-1):
             condition += "(angle == %s && index == %s) || " % position[p]
         condition += "(angle == %s && index == %s)" % position[-1]
         condition += ") return " + color + ";\n"
         code += condition
-    code += "\telse return %s;" % colors[-1]
+    code += "\t\telse return %s;" % colors[-1]
     return code
 
 
@@ -232,58 +220,64 @@ def reconstruct(img):
     return reconstructed
 
 
-image = bit(image)
+images = [bit(image) for image in images]
+CODE = "const int N_IMAGE = %s;\nCRGB getColor(int angle, int index){\n" % len(NAME)
+cpt = 0
 
-# Image de base
-if SHOW_IMAGE:
-    plt.imshow(image)
-    plt.title("Image de base")
-    plt.show()
-
-
-image = compress_img_color(image, COLOR_APPROX_FACTOR)
-
-# Image couleurs compressées
-if SHOW_COMPRESSED_IMAGE:
-    plt.imshow(image)
-    plt.title("Image compressée")
-    plt.show()
-
-# Calcul l'image extraite
-new_img, img = extract(image)
-
-# Affiche l'image de base
-if SHOW_SAMPLING_POINTS:
-    plt.imshow(img)
-    plt.title("Échantillonnage")
-    plt.show()
-
-# Affiche l'image extraite
-if SHOW_EXTRACTED_IMAGE:
-    plt.imshow(new_img)
-    plt.title("Image extraite")
-    plt.show()
-
-sampled = []
-for s in SAMPLING:
-    sampled.append(sampling(new_img, s))
-if SHOW_SAMPLED_IMAGE:
-    for i in range(len(sampled)):
-        plt.imshow(sampled[i])
-        plt.title("Image extraite échantillonnée (%s)" % SAMPLING[i])
+for image in images:
+    # Image de base
+    if SHOW_IMAGE:
+        plt.imshow(image)
+        plt.title("Image de base")
         plt.show()
 
+    image = compress_img_color(image, COLOR_APPROX_FACTOR)
 
-if SHOW_RECONSTRUCTED_IMAGE:
-    for i in range(len(sampled)):
-        reconstruction = reconstruct(sampled[i])
-        plt.imshow(reconstruction)
-        plt.title("Image reconstruite (%s)" % SAMPLING[i])
+    # Image couleurs compressées
+    if SHOW_COMPRESSED_IMAGE:
+        plt.imshow(image)
+        plt.title("Image compressée")
         plt.show()
 
+    # Calcul l'image extraite
+    new_img, img = extract(image)
 
-sampled = sampled[-1]
-compressed, rating = compress(sampled)
-save(sampled)
+    # Affiche l'image de base
+    if SHOW_SAMPLING_POINTS:
+        plt.imshow(img)
+        plt.title("Échantillonnage")
+        plt.show()
 
-print(save_tmp(sampled))
+    # Affiche l'image extraite
+    if SHOW_EXTRACTED_IMAGE:
+        plt.imshow(new_img)
+        plt.title("Image extraite")
+        plt.show()
+
+    sampled = []
+    for s in SAMPLING:
+        sampled.append(sampling(new_img, s))
+    if SHOW_SAMPLED_IMAGE:
+        for i in range(len(sampled)):
+            plt.imshow(sampled[i])
+            plt.title("Image extraite échantillonnée (%s)" % SAMPLING[i])
+            plt.show()
+
+    if SHOW_RECONSTRUCTED_IMAGE:
+        for i in range(len(sampled)):
+            reconstruction = reconstruct(sampled[i])
+            plt.imshow(reconstruction)
+            plt.title("Image reconstruite (%s)" % SAMPLING[i])
+            plt.show()
+
+    sampled = sampled[-1]
+
+    if cpt == len(images)-1:
+        CODE += "\telse {\n%s\n\t}\n" % generateCode(image)
+    else:
+        CODE += "\tif(IMAGE == %s) {\n%s\n\t}\n" % (cpt, generateCode(image))
+    cpt += 1
+
+CODE += "}"
+
+save(CODE)
