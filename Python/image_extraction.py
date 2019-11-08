@@ -221,7 +221,7 @@ def reconstruct(img):
 
 
 images = [bit(image) for image in images]
-CODE = "const int N_IMAGE = %s;\nCRGB getColor(int angle, int index){\n" % len(NAME)
+CODE = "const int EXTRACTION_SIZE = %s;\nconst int N_IMAGE = %s;\nCRGB getColor(int angle, int index){\n" % (SAMPLING[-1], len(NAME))
 cpt = 0
 
 for image in images:
