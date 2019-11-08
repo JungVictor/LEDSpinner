@@ -2,12 +2,34 @@ import PIL
 import numpy as np
 import matplotlib.pyplot as plt
 
+IMAGE_DIR = "images/"
+OUTPUT_DIR = "output/"
+############################################
+# CONFIGURATION
+############################################
 # Nom de l'image
 NAME = "ow.jpg"
 
-SIZE = 42
+# On compresse les couleurs ?
+COMPRESS_COLOR = True
+# Si oui, de combien ?
+COLOR_APPROX_FACTOR = 15
+# Combien de ligne d'angle on garde
+SAMPLING = [180, 90, 45, 20, 12]
 
-image = plt.imread(NAME)
+
+SHOW_IMAGE = False
+SHOW_COMPRESSED_IMAGE = False
+SHOW_SAMPLING_POINTS = False
+SHOW_EXTRACTED_IMAGE = False
+SHOW_SAMPLED_IMAGE = False
+SHOW_RECONSTRUCTED_IMAGE = True
+
+# Taille de la bande de LED
+SIZE = 42
+############################################
+
+image = plt.imread(IMAGE_DIR+NAME)
 reconstruction = [[[0, 0, 0] for y in range(len(image[x]))] for x in range(len(image))]
 
 def black_and_white(img):
@@ -18,7 +40,7 @@ def black_and_white(img):
         for pixel in line:
             color = [0, 0, 0]
             for i in range(3):
-                if pixel[i] > 127 :
+                if pixel[i] > 127:
                     color[i] = 255
                 else:
                     color[i] = 0
@@ -118,8 +140,8 @@ def compress(img):
 def sampling(img, step):
     nSamples = 180 // step
     samples = []
-    for i in range(nSamples):
-        samples.append(img[i*step])
+    for i in range(step):
+        samples.append(img[i*nSamples])
     return samples
 
 
@@ -140,37 +162,79 @@ def save(image):
         if l != len(image)-1:
             img += ","
     img += "};\n"
-    f = open("output.led", "w+")
+    name = NAME[:-4]
+    f = open(OUTPUT_DIR+name+"-%s.led" % len(image), "w+")
     f.write(img)
     print("Saved")
 
 
+def reconstruct(img):
+    reconstructed = [[[0,0,0] for i in range(SIZE)] for j in range(SIZE)]
+    size = SIZE
+    for i in range(180, 0, -1):
+        radian = i / 180 * np.pi
+        cos = np.cos(radian)
+        sin = np.sin(radian)
+        index = int(np.round(i * (len(img)-1)/180))
+        for j in range(SIZE//2):
+            k = j
+            xPos1 = int(np.round(cos * k + size/2))
+            yPos1 = int(np.round(sin * k + size/2))
+            xPos2 = size - xPos1
+            yPos2 = size - yPos1
+            reconstructed[xPos1][yPos1] = img[index][j+SIZE//2]
+            reconstructed[xPos2][yPos2] = img[index][SIZE//2-j-1]
+    return reconstructed
+
+
+
 # Image de base
-plt.imshow(image)
-plt.show()
+if SHOW_IMAGE:
+    plt.imshow(image)
+    plt.title("Image de base")
+    plt.show()
 
-# Image couleur compressée
+
 image = compress_img_color(image, 15)
-plt.imshow(image)
-plt.show()
 
-# Affiche l'image extraite
+# Image couleurs compressées
+if SHOW_COMPRESSED_IMAGE:
+    plt.imshow(image)
+    plt.title("Image compressée")
+    plt.show()
+
+# Calcul l'image extraite
 new_img, img = extract(image)
 
 # Affiche l'image de base
-plt.imshow(img)
-plt.show()
+if SHOW_SAMPLING_POINTS:
+    plt.imshow(img)
+    plt.title("Échantillonnage")
+    plt.show()
 
-# Affiche l'image de base
-plt.imshow(new_img)
-plt.show()
+# Affiche l'image extraite
+if SHOW_EXTRACTED_IMAGE:
+    plt.imshow(new_img)
+    plt.title("Image extraite")
+    plt.show()
 
-sampled = sampling(new_img, 15)
-plt.imshow(sampled)
-plt.show()
-plt.show()
+sampled = []
+for s in SAMPLING:
+    sampled.append(sampling(new_img, s))
+if SHOW_SAMPLED_IMAGE:
+    for i in range(len(sampled)):
+        plt.imshow(sampled[i])
+        plt.title("Image extraite échantillonnée (%s)" % SAMPLING[i])
+        plt.show()
 
+
+if SHOW_RECONSTRUCTED_IMAGE:
+    for i in range(len(sampled)):
+        reconstruction = reconstruct(sampled[i])
+        plt.imshow(reconstruction)
+        plt.title("Image reconstruite (%s)" % SAMPLING[i])
+        plt.show()
+
+sampled = sampled[-1]
 compressed, rating = compress(sampled)
-
 save(sampled)
-
