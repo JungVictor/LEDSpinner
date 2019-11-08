@@ -8,17 +8,17 @@ OUTPUT_DIR = "output/"
 # CONFIGURATION
 ############################################
 # Nom de l'image
-NAME = "ow.jpg"
+NAME = "sonic2.jpg"
 
 # On compresse les couleurs ?
-COMPRESS_COLOR = True
+COMPRESS_COLOR = False
 # Si oui, de combien ?
-COLOR_APPROX_FACTOR = 15
+COLOR_APPROX_FACTOR = 50
 # Combien de ligne d'angle on garde
-SAMPLING = [180, 90, 45, 20, 12]
+SAMPLING = [180, 90, 45]
 
 
-SHOW_IMAGE = False
+SHOW_IMAGE = True
 SHOW_COMPRESSED_IMAGE = False
 SHOW_SAMPLING_POINTS = False
 SHOW_EXTRACTED_IMAGE = False
@@ -32,7 +32,8 @@ SIZE = 42
 image = plt.imread(IMAGE_DIR+NAME)
 reconstruction = [[[0, 0, 0] for y in range(len(image[x]))] for x in range(len(image))]
 
-def black_and_white(img):
+
+def bit(img):
     bw = []
     for l in range(len(img)):
         bw.append([])
@@ -46,6 +47,21 @@ def black_and_white(img):
                     color[i] = 0
             bw[l].append(color)
     return bw
+
+
+def black_and_white(img):
+    bw = []
+    for l in range(len(img)):
+        bw.append([])
+        line = img[l]
+        for pixel in line:
+            color = [0, 0, 0]
+            c = int(pixel[0]) + int(pixel[1]) + int(pixel[2])
+            if c > 381:
+                color = [255, 255, 255]
+            bw[l].append(color)
+    return bw
+
 
 def extract(img):
     size = len(img)
@@ -168,6 +184,35 @@ def save(image):
     print("Saved")
 
 
+def save_tmp(image):
+    dico = {}
+    for l in range(len(image)):
+        line = image[l]
+        for p in range(len(line)):
+            r, g, b = line[p]
+            pixel = "CRGB(%s, %s, %s)" % (r, g, b)
+            if not pixel in dico:
+                dico[pixel] = []
+            dico[pixel].append((l, p))
+
+    code = ""
+    colors = sorted(dico, key=lambda k: len(dico[k]), reverse=False)
+    for c in range(len(colors)-1):
+        color = colors[c]
+        position = dico[color]
+        if c == 0:
+            condition = "\tif ("
+        else :
+            condition = "\telse if ("
+        for p in range(len(position)-1):
+            condition += "(angle == %s && index == %s) || " % position[p]
+        condition += "(angle == %s && index == %s)" % position[-1]
+        condition += ") return " + color + ";\n"
+        code += condition
+    code += "\telse return %s;" % colors[-1]
+    return code
+
+
 def reconstruct(img):
     reconstructed = [[[0,0,0] for i in range(SIZE)] for j in range(SIZE)]
     size = SIZE
@@ -187,6 +232,7 @@ def reconstruct(img):
     return reconstructed
 
 
+image = bit(image)
 
 # Image de base
 if SHOW_IMAGE:
@@ -195,7 +241,7 @@ if SHOW_IMAGE:
     plt.show()
 
 
-image = compress_img_color(image, 15)
+image = compress_img_color(image, COLOR_APPROX_FACTOR)
 
 # Image couleurs compressées
 if SHOW_COMPRESSED_IMAGE:
@@ -235,6 +281,9 @@ if SHOW_RECONSTRUCTED_IMAGE:
         plt.title("Image reconstruite (%s)" % SAMPLING[i])
         plt.show()
 
+
 sampled = sampled[-1]
 compressed, rating = compress(sampled)
 save(sampled)
+
+print(save_tmp(sampled))
