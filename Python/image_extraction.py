@@ -10,7 +10,8 @@ OUTPUT_DIR = "output/"
 # Nom du fichier de sauvegarde
 FILE_NAME = "sonic"
 # Nom de l'image
-NAME = ["sonic1.jpg"]
+NAME = ["sonic-gif1.jpg", "sonic-gif2.jpg", "sonic-gif3.jpg", "sonic-gif4.jpg",
+        "sonic-gif5.jpg", "sonic-gif6.jpg"]
 
 # On compresse les couleurs ?
 COMPRESS_COLOR = False
@@ -20,7 +21,7 @@ COLOR_APPROX_FACTOR = 50
 SAMPLING = [45]
 
 
-SHOW_IMAGE = True
+SHOW_IMAGE = False
 SHOW_COMPRESSED_IMAGE = False
 SHOW_SAMPLING_POINTS = False
 SHOW_EXTRACTED_IMAGE = False
@@ -277,11 +278,11 @@ for image in images:
 
     if cpt == len(images)-1:
         if len(NAME) > 1:
-            CODE += "\telse {\n%s\n\t}\n" % generateCode(image)
+            CODE += "\telse {\n%s\n\t}\n" % generateCode(sampled)
         else:
-            CODE += "%s\n" % generateCode(image)
+            CODE += "%s\n" % generateCode(sampled)
     else:
-        CODE += "\tif(IMAGE == %s) {\n%s\n\t}\n" % (cpt, generateCode(image))
+        CODE += "\tif(IMAGE == %s) {\n%s\n\t}\n" % (cpt, generateCode(sampled))
     cpt += 1
 
 CODE += "}"
