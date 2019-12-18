@@ -22,10 +22,10 @@ COMPRESS_COLOR = False
 COLOR_APPROX_FACTOR = 50
 # Combien de ligne d'angle on garde
 SAMPLING = [45]                 # Traditionnel
-COMPRESSION_SAMPLING = [45]     # Nouveau
+COMPRESSION_SAMPLING = [80]     # Nouveau
 
 # Méthode de compression automatique (pour l'instant pas ouf)
-COMPRESSED_INDEX_METHOD = POW2
+COMPRESSED_INDEX_METHOD = LINEAR
 
 SHOW_IMAGE = True
 SHOW_COMPRESSED_IMAGE = False
@@ -35,7 +35,7 @@ SHOW_SAMPLED_IMAGE = False
 SHOW_RECONSTRUCTED_IMAGE = True
 
 # Taille de la bande de LED
-SIZE = 42
+SIZE = 201
 ############################################
 
 images = [plt.imread(IMAGE_DIR+n) for n in NAME]
@@ -46,10 +46,22 @@ reconstruction = [[[0, 0, 0] for y in range(len(images[0][x]))] for x in range(l
 # et renvoit un tableau qui correspond à la position du premier index
 # [2, 4, 8, 16, 32] -> [0, 2, 6, 14, 30, 62]
 def build_positions(sizes):
+    sizes = symmetry(sizes)
+    print(sizes)
     index_position = [0]
     for i in range(1, len(sizes)+1):
         index_position.append(index_position[i-1] + sizes[i-1])
     return sizes, index_position
+
+
+def symmetry(sizes):
+    sym = []
+    for i in range(len(sizes)):
+        sym.append(sizes[-(i+1)])
+    for i in range(len(sizes)):
+        sym.append(sizes[i])
+    return sym
+
 
 
 ##################################
@@ -58,19 +70,22 @@ def build_positions(sizes):
 ##################################
 # CONSTANTE
 def constant(num_led, max_size):
-    index_size = [max_size for i in range(num_led)]
+    mid = int(np.ceil(num_led/2))
+    index_size = [max_size for i in range(mid)]
     return build_positions(index_size)
 
 
 # LINEAIRE
 def linear(num_led, max_size):
-    index_size = [round((i)*(max_size/num_led)+1) for i in range(num_led)]
+    mid = int(np.ceil(num_led/2))
+    index_size = [max(20, round(i*(max_size/mid)+1)) for i in range(mid)]
     return build_positions(index_size)
 
 
 # PUISSANCE 2
 def pow2(num_led, max_size):
-    index_size = [min(max_size, int(round(i**2))) for i in range(num_led)]
+    mid = int(np.ceil(num_led/2))
+    index_size = [min(max_size, int(round(np.log2((i+1)*8)*4))) for i in range(mid)]
     return build_positions(index_size)
 
 
@@ -99,7 +114,7 @@ def bit(img):
                     color[i] = 0
             bw[l].append(color)
     return bw
-CONSTANT
+
 
 # Modifie les couleurs de l'image pour qu'elle soit en noir et blanc (pas de nuance)
 def black_and_white(img):
@@ -171,15 +186,14 @@ def compress_img_color(img, factor=20):
 # NOUVELLE METHODE !!!
 # On compresse l'image en fonction d'un nombre d'échantillon pour chaque LED
 def compress(img, type=LINEAR, SAMPLING_SIZE=45):
-    compressed = []
     compression_size, positions = size_and_pos(type, SAMPLING_SIZE)
-
+    compressed = []
     for i in range(SIZE):
         s = compression_size[i]
         for j in range(s):
             index = round(179*j/s)
-            compressed.append(img[index][(i+SIZE//2)%SIZE])
-    print("Compression : %s" % (len(compressed)/(SIZE*SAMPLING_SIZE)))
+            compressed.append(img[index][i])
+    print("Compression : %s" % (len(compressed)/(SIZE*45)))
     return compressed, positions
 
 
@@ -217,8 +231,8 @@ def reconstruct_img(compressed, positions):
             yPos1 = int(np.round(sin * led + size/2))
             xPos2 = size - xPos1
             yPos2 = size - yPos1
-            reconstructed[xPos1][yPos1] = getPixel(i/180, led, compressed, positions)
-            reconstructed[xPos2][yPos2] = getPixel(i/180, SIZE-1-led, compressed, positions)
+            reconstructed[xPos1][yPos1] = getPixel(i/180, led+SIZE//2, compressed, positions)
+            reconstructed[xPos2][yPos2] = getPixel(i/180, SIZE//2-led, compressed, positions)
     return reconstructed
 
 
