@@ -4,12 +4,15 @@ import matplotlib.pyplot as plt
 
 IMAGE_DIR = "images/"
 OUTPUT_DIR = "output/"
+LINEAR = 0
+POW2 = 1
+CONSTANT = 2
 ############################################
 # CONFIGURATION
 ############################################
 # Nom du fichier de sauvegarde
 FILE_NAME = "sonic"
-# Nom de l'image
+# Nom des images
 NAME = ["sonic-gif1.jpg", "sonic-gif2.jpg", "sonic-gif3.jpg", "sonic-gif4.jpg",
         "sonic-gif5.jpg", "sonic-gif6.jpg"]
 
@@ -18,10 +21,13 @@ COMPRESS_COLOR = False
 # Si oui, de combien ?
 COLOR_APPROX_FACTOR = 50
 # Combien de ligne d'angle on garde
-SAMPLING = [45]
+SAMPLING = [45]                 # Traditionnel
+COMPRESSION_SAMPLING = [45]     # Nouveau
 
+# Méthode de compression automatique (pour l'instant pas ouf)
+COMPRESSED_INDEX_METHOD = POW2
 
-SHOW_IMAGE = False
+SHOW_IMAGE = True
 SHOW_COMPRESSED_IMAGE = False
 SHOW_SAMPLING_POINTS = False
 SHOW_EXTRACTED_IMAGE = False
@@ -36,6 +42,49 @@ images = [plt.imread(IMAGE_DIR+n) for n in NAME]
 reconstruction = [[[0, 0, 0] for y in range(len(images[0][x]))] for x in range(len(images))]
 
 
+# Prend en entrée un tableau de taille d'échantillon pour chaque LED,
+# et renvoit un tableau qui correspond à la position du premier index
+# [2, 4, 8, 16, 32] -> [0, 2, 6, 14, 30, 62]
+def build_positions(sizes):
+    index_position = [0]
+    for i in range(1, len(sizes)+1):
+        index_position.append(index_position[i-1] + sizes[i-1])
+    return sizes, index_position
+
+
+##################################
+# FONCTIONS DE DISTRIBUTIONS (?)
+# A REFAIRE /!\ (manuel pour 42 ?)
+##################################
+# CONSTANTE
+def constant(num_led, max_size):
+    index_size = [max_size for i in range(num_led)]
+    return build_positions(index_size)
+
+
+# LINEAIRE
+def linear(num_led, max_size):
+    index_size = [round((i)*(max_size/num_led)+1) for i in range(num_led)]
+    return build_positions(index_size)
+
+
+# PUISSANCE 2
+def pow2(num_led, max_size):
+    index_size = [min(max_size, int(round(i**2))) for i in range(num_led)]
+    return build_positions(index_size)
+
+
+# "Factory" pour générer en fonction du paramètre "type"
+def size_and_pos(type, size):
+    if type == LINEAR:
+        return linear(SIZE, size)
+    if type == POW2:
+        return pow2(SIZE, size)
+    return constant(SIZE, size)
+#################################
+
+
+# Modifie les couleurs de l'image pour que les couleurs soient sur 1 bit (8 couleurs)
 def bit(img):
     bw = []
     for l in range(len(img)):
@@ -50,8 +99,9 @@ def bit(img):
                     color[i] = 0
             bw[l].append(color)
     return bw
+CONSTANT
 
-
+# Modifie les couleurs de l'image pour qu'elle soit en noir et blanc (pas de nuance)
 def black_and_white(img):
     bw = []
     for l in range(len(img)):
@@ -66,6 +116,8 @@ def black_and_white(img):
     return bw
 
 
+# Extrait les pixels de l'image d'origine
+# Renvoit une image polaire + l'image d'origine avec les pixels échantillonés en rouge
 def extract(img):
     size = len(img)
     ratio = size / SIZE
@@ -89,30 +141,17 @@ def extract(img):
     return res, image
 
 
-# Pareil mais pour une ligne
-def traceOne(extraction, support, pattern, angle):
-    size = len(extraction)
-    angle = int(np.floor(angle * (size / 180)))
-    LEDS = extraction[angle]
-    coords = pattern[angle]
-    for i in range(len(coords)):
-        x, y = coords[i]
-        support[x][y] = LEDS[i]
-    return support
-
-
-def trace(extraction, support, pattern, angle):
-    for i in range(angle):
-        support = traceOne(extraction, support, pattern, i)
-    return support
-
-
+# Compare deux couleurs et renvoit True si elles sont égales, False sinon.
 def eq_color(c1, c2):
     for i in range(len(c1)):
         if c1[i] != c2[i]:
             return False
     return True
 
+
+# On compresse les couleurs selon un facteur.
+# Si le facteur est 1 -> identité
+# Si le facteur est 20 : 0 -> 0, 15 -> 20 etc...
 def compress_color(c1, factor=20):
     color = []
     for c in c1:
@@ -120,6 +159,7 @@ def compress_color(c1, factor=20):
     return color
 
 
+# On compresse toutes les couleurs de l'image selon un facteur
 def compress_img_color(img, factor=20):
     color = [[img[l][p] for p in range(len(img[l]))] for l in range(len(img))]
     for l in range(len(img)):
@@ -128,40 +168,79 @@ def compress_img_color(img, factor=20):
     return color
 
 
-def compress(img):
+# NOUVELLE METHODE !!!
+# On compresse l'image en fonction d'un nombre d'échantillon pour chaque LED
+def compress(img, type=LINEAR, SAMPLING_SIZE=45):
     compressed = []
-    xSize = len(img)
-    ySize = len(img[0])
-    pixel = None
-    count = 0
-    compressed_pixel = 0
-    for x in range(xSize):
-        compressed.append([])
-        for y in range(ySize):
-            color = img[x][y]
-            if y == 0:
-                pixel = color
-            if not eq_color(pixel, color):
-                compressed[x].append((pixel, count))
-                count = 0
-                pixel = color
-                compressed_pixel += count
-            count += 1
-        compressed[x].append((pixel, count))
-        compressed_pixel += count
-        count = 0
-        pixel = None
-    compression_rate = compressed_pixel / (xSize * ySize) * 100
-    print("Compression rate : %s" % compression_rate)
-    return compressed, compression_rate
+    compression_size, positions = size_and_pos(type, SAMPLING_SIZE)
+
+    for i in range(SIZE):
+        s = compression_size[i]
+        for j in range(s):
+            index = round(179*j/s)
+            compressed.append(img[index][(i+SIZE//2)%SIZE])
+    print("Compression : %s" % (len(compressed)/(SIZE*SAMPLING_SIZE)))
+    return compressed, positions
 
 
+# ANCIENNE METHODE
+# On compresse l'image en échantillonant de manière constante
 def sampling(img, step):
     nSamples = 180 // step
     samples = []
     for i in range(step):
         samples.append(img[i*nSamples])
     return samples
+
+
+# Retourne la taille de l'échantillon pour la LED index
+def getSize(positions, index):
+    return positions[index+1] - positions[index]
+
+
+# Retourne le pixel correspondant à l'angle à la LED index.
+def getPixel(angle, index, img, positions):
+    return img[round(angle * (getSize(positions, index)-1)) + positions[index]]
+
+
+# NOUVELLE METHODE !!
+# Reconstruit l'image à partir de l'image compressée (vérification)
+def reconstruct_img(compressed, positions):
+    reconstructed = [[[0,0,0] for i in range(SIZE)] for j in range(SIZE)]
+    size = SIZE
+    for i in range(180):
+        radian = i / 180 * np.pi
+        cos = np.cos(radian)
+        sin = np.sin(radian)
+        for led in range(SIZE//2):
+            xPos1 = int(np.round(cos * led + size/2))
+            yPos1 = int(np.round(sin * led + size/2))
+            xPos2 = size - xPos1
+            yPos2 = size - yPos1
+            reconstructed[xPos1][yPos1] = getPixel(i/180, led, compressed, positions)
+            reconstructed[xPos2][yPos2] = getPixel(i/180, SIZE-1-led, compressed, positions)
+    return reconstructed
+
+
+# ANCIENNE METHODE !!
+# Reconstruit l'image à partir de l'image compressée (vérification)
+def reconstruct(img):
+    reconstructed = [[[0,0,0] for i in range(SIZE)] for j in range(SIZE)]
+    size = SIZE
+    for i in range(180, 0, -1):
+        radian = i / 180 * np.pi
+        cos = np.cos(radian)
+        sin = np.sin(radian)
+        index = int(np.round(i * (len(img)-1)/180))
+        for j in range(SIZE//2):
+            k = j
+            xPos1 = int(np.round(cos * k + size/2))
+            yPos1 = int(np.round(sin * k + size/2))
+            xPos2 = size - xPos1
+            yPos2 = size - yPos1
+            reconstructed[xPos1][yPos1] = img[index][j+SIZE//2]
+            reconstructed[xPos2][yPos2] = img[index][SIZE//2-j-1]
+    return reconstructed
 
 
 # Sauvegarde l'image dans un .led
@@ -172,6 +251,13 @@ def save(txt):
     print("Saved as %s" % filename)
 
 
+# NOUVELLE METHODE !!
+# Génère le code de l'image
+def generate(compression, positions):
+    return "CRGB COLORS[] = %s;\nint POSITIONS[] = %s;\n" % (compression, positions)
+
+
+# ANCIENNE METHODE !!
 # Génère le code de l'image
 def generateCode(image):
     dico = {}
@@ -204,24 +290,6 @@ def generateCode(image):
     code += TAB+"else return %s;" % colors[-1]
     return code
 
-
-def reconstruct(img):
-    reconstructed = [[[0,0,0] for i in range(SIZE)] for j in range(SIZE)]
-    size = SIZE
-    for i in range(180, 0, -1):
-        radian = i / 180 * np.pi
-        cos = np.cos(radian)
-        sin = np.sin(radian)
-        index = int(np.round(i * (len(img)-1)/180))
-        for j in range(SIZE//2):
-            k = j
-            xPos1 = int(np.round(cos * k + size/2))
-            yPos1 = int(np.round(sin * k + size/2))
-            xPos2 = size - xPos1
-            yPos2 = size - yPos1
-            reconstructed[xPos1][yPos1] = img[index][j+SIZE//2]
-            reconstructed[xPos2][yPos2] = img[index][SIZE//2-j-1]
-    return reconstructed
 
 
 images = [bit(image) for image in images]
@@ -269,9 +337,15 @@ for image in images:
 
     if SHOW_RECONSTRUCTED_IMAGE:
         for i in range(len(sampled)):
+            compressed, positions = compress(new_img, COMPRESSED_INDEX_METHOD, COMPRESSION_SAMPLING[i])
+            reconstruction = reconstruct_img(compressed, positions)
+            plt.imshow(reconstruction)
+            plt.title("Image reconstruite (%s) NEW" % SAMPLING[i])
+            plt.show()
+
             reconstruction = reconstruct(sampled[i])
             plt.imshow(reconstruction)
-            plt.title("Image reconstruite (%s)" % SAMPLING[i])
+            plt.title("Image reconstruite (%s) OLD" % SAMPLING[i])
             plt.show()
 
     sampled = sampled[-1]
