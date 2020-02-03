@@ -336,12 +336,12 @@ def generate_code_array(image, colors):
         code = "{"
         for pixel in image[:-1]:
             color = "CRGB(%s, %s, %s)" % (pixel[0], pixel[1], pixel[2])
-            if not colors.__contains__(color):
+            if color not in colors:
                 colors[color] = len(colors)
             code += "%s, " % colors[color]
         pixel = image[len(image)-1]
         color = "CRGB(%s, %s, %s)" % (pixel[0], pixel[1], pixel[2])
-        if not colors.__contains__(color):
+        if color not in colors:
             colors[color] = len(colors)
         code += "%s" % colors[color]
         return code+"}"

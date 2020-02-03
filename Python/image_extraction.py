@@ -79,7 +79,7 @@ def constant(num_led, max_size):
 # LINEAIRE
 def linear(num_led, max_size):
     mid = int(np.ceil(num_led / 2))
-    index_size = [max(0, round(i * (max_size / mid) + 1)) for i in range(mid)]
+    index_size = [max(0, round(i * (max_size / mid))+1) for i in range(mid)]
     return build_positions(index_size)
 
 
@@ -104,9 +104,9 @@ def size_and_pos(type, size, led=SIZE):
 
 # Modifie les couleurs de l'image pour que les couleurs soient sur 1 bit (8 couleurs)
 def bit(img):
-    bw = []
+    bit3 = []
     for l in range(len(img)):
-        bw.append([])
+        bit3.append([])
         line = img[l]
         for pixel in line:
             color = [0, 0, 0]
@@ -115,8 +115,8 @@ def bit(img):
                     color[i] = 255
                 else:
                     color[i] = 0
-            bw[l].append(color)
-    return bw
+            bit3[l].append(color)
+    return bit3
 
 
 # Modifie les couleurs de l'image pour qu'elle soit en noir et blanc (pas de nuance)
@@ -213,8 +213,7 @@ def compress(img, type=LINEAR, SAMPLING_SIZE=45, size=SIZE):
     for i in range(size):
         s = compression_size[i]
         for j in range(s):
-            j = j % s
-            index = round(179 * j / s)
+            index = round(180 * j / s)
             compressed.append(img[index][i])
     #print("Compression : %s" % (len(compressed) / (size * 45)))
     return compressed, positions
@@ -339,7 +338,6 @@ def compute(image, led_num=42, compress_color=False, color_approx_factor=50, com
         new_img = bit(new_img)
     elif compress_color:
         new_img = compress_img_color(new_img, color_approx_factor)
-    sampled = sampling(new_img, sampling_size)
     compressed, positions = compress(new_img, compressed_index_method, sampling_size, led_num)
     reconstruction = reconstruct_img(compressed, positions, led_num, c)
 
