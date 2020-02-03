@@ -339,7 +339,6 @@ def compute(image, led_num=42, compress_color=False, color_approx_factor=50, com
         new_img = bit(new_img)
     elif compress_color:
         new_img = compress_img_color(new_img, color_approx_factor)
-    sampled = sampling(new_img, sampling_size)
     compressed, positions = compress(new_img, compressed_index_method, sampling_size, led_num)
     reconstruction = reconstruct_img(compressed, positions, led_num, c)
 
