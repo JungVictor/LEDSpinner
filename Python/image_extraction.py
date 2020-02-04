@@ -27,7 +27,7 @@ COMPRESSION_SAMPLING = [45, 90]  # Nouveau
 # Méthode de compression automatique (pour l'instant pas ouf)
 COMPRESSED_INDEX_METHOD = LINEAR
 
-SHOW_IMAGE = True
+SHOW_IMAGE = False
 SHOW_COMPRESSED_IMAGE = False
 SHOW_SAMPLING_POINTS = False
 SHOW_EXTRACTED_IMAGE = False
@@ -35,7 +35,7 @@ SHOW_SAMPLED_IMAGE = False
 SHOW_RECONSTRUCTED_IMAGE = True
 
 # Taille de la bande de LED
-SIZE = 42
+SIZE = 144
 ############################################
 
 images = [plt.imread(IMAGE_DIR + n) for n in NAME]
